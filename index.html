@@ -153,7 +153,7 @@ const LDESC=['',
 'Parkour across rooftops to the skyscraper!\n[A] Jump  [B] Duck',
 'Nerf fight on the roof! Hit all 3 brothers!\n[Stick] Move  [A] Shoot',
 'Snowboard race down the mountain!\n[Stick] Steer  [A] Jump  [B] Boost',
-'Box your brothers for the brownie!\nPunch-Out style!\n[A] Punch  [B] Block  [Stick] Dodge'];
+'Box your brothers for the brownie!\nPunch-Out style!\n[A] Punch  [Stick] Dodge - No blocking!'];
 
 // ── INIT LEVEL ──
 function initLevel(n){
@@ -220,7 +220,7 @@ function updL1(){
   }else{
     for(let b of LD.bros){b.x+=b.spd+spd*.45;if(b.x>g.x-25)b.x=g.x-25}
   }
-  if(g.x>=LD.lw-200){state='win';winT=0}
+  if(g.x>=LD.lw-W()-100){state='win';winT=0}
 }
 
 function drawL1(){
@@ -241,6 +241,14 @@ function drawL1(){
     else if(o.type==='hydrant'){rect(ox+2,o.y,o.w-4,o.h,'#D32F2F');rect(ox-1,o.y+7,o.w+2,5,'#B71C1C')}
     else{rect(ox,o.y,o.w,o.h,'#607D8B');rect(ox-2,o.y,o.w+4,4,'#455A64')}
   }}
+  // Finish line
+  const finX=LD.lw-W()-100-sx;
+  if(finX<w+50&&finX>-50){
+    for(let fy=gy-80;fy<gy;fy+=10)for(let fx2=0;fx2<20;fx2+=10){
+      rect(finX+fx2,fy,10,10,((fy/10+fx2/10)%2===0)?'#fff':'#333');
+    }
+    otxt('FINISH!',finX+10,gy-90,14,'#FFD700','#000');
+  }
   // School
   const schX=LD.lw-200-sx;
   if(schX<w+150){rect(schX,gy-160,150,160,'#FFE0B2');rect(schX+60,gy-50,28,50,'#795548');otxt('SCHOOL',schX+75,gy-170,14,'#333','#fff');rect(schX+130,gy-190,3,35,'#333');rect(schX+133,gy-190,20,12,'#F44336')}
@@ -259,22 +267,22 @@ function drawL1(){
 // ════════════════════════════════════════
 function initL2(){
   const w=W(),h=H();
-  LD={sx:0,sy:0,g:{x:60,y:0,w:30,h:44,vx:0,vy:0,jump:false,duck:false,gnd:false},
+  LD={sx:0,sy:0,g:{x:60,y:0,w:30,h:44,vx:0,vy:0,jump:false,duck:false,gnd:false,jumps:0,maxJumps:2},
     plats:[],obs:[],bros:[
-      {x:-60,y:0,w:30,h:44,spd:2.8,type:'rowan',vy:0},
-      {x:-140,y:0,w:30,h:48,spd:2.5,type:'sandy',vy:0},
-      {x:-220,y:0,w:30,h:42,spd:2.2,type:'jude',vy:0},
+      {x:-60,y:0,w:30,h:44,spd:3.0,type:'rowan',vy:0,gnd:false},
+      {x:-140,y:0,w:30,h:48,spd:2.7,type:'sandy',vy:0,gnd:false},
+      {x:-220,y:0,w:30,h:42,spd:2.4,type:'jude',vy:0,gnd:false},
     ],blds:[],finX:0,finY:0,lh:h*4};
-  let bx=0,by=h*3.2;
+  let bx=0,by=h*2.5;
   for(let i=0;i<30;i++){
-    const bw=100+Math.random()*110,bh=180+Math.random()*250,gap=50+Math.random()*65;
+    const bw=100+Math.random()*110,bh=100+Math.random()*120,gap=40+Math.random()*55;
     LD.blds.push({x:bx,y:by-bh,w:bw,h:bh,c:`hsl(${210+Math.random()*30},${25+Math.random()*15}%,${35+Math.random()*25}%)`});
     LD.plats.push({x:bx,y:by-bh,w:bw,h:12});
     if(i>3&&Math.random()>.55){
       const tp=['wire','guard','tmnt'][(Math.random()*3)|0];
       LD.obs.push({x:bx+bw*.25,y:by-bh-35,w:tp==='wire'?bw*.5:26,h:tp==='wire'?4:36,type:tp,dir:1,sx:bx+8,ex:bx+bw-35});
     }
-    bx+=bw+gap;by-=25+Math.random()*40;
+    bx+=bw+gap;by-=15+Math.random()*25;
   }
   LD.g.x=60;LD.g.y=LD.plats[0].y-50;
   const lb=LD.blds[LD.blds.length-1];
@@ -285,11 +293,12 @@ function updL2(){
   const inp=input(),g=LD.g,grav=.52;
   if(levelStartTimer>0)levelStartTimer--;
   g.vx=inp.dx*4.5;g.x+=g.vx;g.duck=inp.b;
-  if(inp.a&&g.gnd){g.vy=-12;g.jump=true;g.gnd=false}
+  // Double jump: can jump once on ground AND once in air
+  if(inp.a&&!prevA&&g.jumps<g.maxJumps){g.vy=-11.5;g.jump=true;g.gnd=false;g.jumps++}
   g.vy+=grav;g.y+=g.vy;g.gnd=false;
   for(let p of LD.plats){
     if(g.x+g.w>p.x&&g.x<p.x+p.w&&g.y+g.h>=p.y&&g.y+g.h<=p.y+p.h+8&&g.vy>=0){
-      g.y=p.y-g.h;g.vy=0;g.gnd=true;g.jump=false;
+      g.y=p.y-g.h;g.vy=0;g.gnd=true;g.jump=false;g.jumps=0;
     }
   }
   if(g.y>LD.lh+80){die('Fell off the building!');return}
@@ -302,8 +311,11 @@ function updL2(){
     }
   }
   for(let b of LD.bros){
-    b.x+=Math.sign(g.x-b.x)*b.spd;b.vy+=grav;b.y+=b.vy;
-    for(let p of LD.plats){if(b.x+b.w>p.x&&b.x<p.x+p.w&&b.y+b.h>=p.y&&b.y+b.h<=p.y+15&&b.vy>=0){b.y=p.y-b.h;b.vy=0;if(Math.abs(g.x-b.x)>50&&Math.random()>.97)b.vy=-10}}
+    b.x+=Math.sign(g.x-b.x)*b.spd;b.vy+=grav;b.y+=b.vy;b.gnd=false;
+    for(let p of LD.plats){if(b.x+b.w>p.x&&b.x<p.x+p.w&&b.y+b.h>=p.y&&b.y+b.h<=p.y+15&&b.vy>=0){b.y=p.y-b.h;b.vy=0;b.gnd=true}}
+    // Brothers jump aggressively to follow
+    if(b.gnd&&(g.y<b.y-30||Math.abs(g.x-b.x)>60)){b.vy=-11;b.gnd=false}
+    if(!b.gnd&&b.vy>0&&g.y<b.y-20&&Math.random()>.92){b.vy=-9} // mid-air jump sometimes
     if(Math.abs(b.x-g.x)<16&&Math.abs(b.y-g.y)<25){die(b.type[0].toUpperCase()+b.type.slice(1)+' caught you!');return}
   }
   }else{
@@ -352,8 +364,16 @@ function initL3(){
       {x:w-130,y:120,w:30,h:48,type:'sandy',hp:3,hit:0,st:0,dir:-1,spd:1.6},
       {x:w/2,y:60,w:30,h:42,type:'jude',hp:3,hit:0,st:0,dir:1,spd:1.8},
     ],
+    barriers:[],
     bul:[],timer:60*60,par:[]
   };
+  // Add barriers to hide behind
+  const ax=LD.ax,ay=LD.ay,aw=LD.aw,ah=LD.ah;
+  LD.barriers.push({x:ax+aw*.2,y:ay+ah*.3,w:40,h:50});
+  LD.barriers.push({x:ax+aw*.7,y:ay+ah*.25,w:40,h:50});
+  LD.barriers.push({x:ax+aw*.45,y:ay+ah*.6,w:50,h:40});
+  LD.barriers.push({x:ax+aw*.15,y:ay+ah*.7,w:35,h:45});
+  LD.barriers.push({x:ax+aw*.8,y:ay+ah*.65,w:40,h:45});
 }
 
 function updL3(){
@@ -381,6 +401,10 @@ function updL3(){
   for(let i=LD.bul.length-1;i>=0;i--){
     const bl=LD.bul[i];bl.x+=bl.dx;bl.y+=bl.dy;
     if(bl.x<0||bl.x>w||bl.y<0||bl.y>h){LD.bul.splice(i,1);continue}
+    // Barrier collision
+    let hitBarrier=false;
+    for(let bar of LD.barriers){if(bl.x>bar.x&&bl.x<bar.x+bar.w&&bl.y>bar.y&&bl.y<bar.y+bar.h){hitBarrier=true;break}}
+    if(hitBarrier){LD.bul.splice(i,1);continue}
     if(bl.f){for(let b of LD.bros){if(b.hp<=0)continue;if(bl.x>b.x&&bl.x<b.x+b.w&&bl.y>b.y&&bl.y<b.y+b.h){
       b.hp--;b.hit=12;LD.bul.splice(i,1);shake=5;shakeI=3;
       for(let p=0;p<5;p++)LD.par.push({x:bl.x,y:bl.y,dx:(Math.random()-.5)*5,dy:(Math.random()-.5)*5,l:18,c:'#FF6B1A'});break;
@@ -398,6 +422,12 @@ function drawL3(){
   const w=W(),h=H();
   rect(0,0,w,h,'#546E7A');rect(LD.ax,LD.ay,LD.aw,LD.ah,'#78909C');
   X.strokeStyle='#FFD700';X.lineWidth=2;X.strokeRect(LD.ax,LD.ay,LD.aw,LD.ah);
+  // Barriers
+  for(let bar of LD.barriers){
+    rect(bar.x,bar.y,bar.w,bar.h,'#455A64');
+    rect(bar.x+2,bar.y+2,bar.w-4,bar.h-4,'#546E7A');
+    rect(bar.x+bar.w*.2,bar.y+bar.h*.3,bar.w*.6,bar.h*.15,'#37474F');
+  }
   for(let b of LD.bros){
     if(b.hp<=0){X.globalAlpha=.4;rect(b.x,b.y+b.h-12,b.w,12,'#555');X.globalAlpha=1;continue}
     if(b.hit>0)X.globalAlpha=.5+Math.sin(frame*.5)*.3;
@@ -425,13 +455,13 @@ function initL4(){
   LD={rl:7000,
     g:{x:w/2,y:75,prog:0,spd:4,w:28,h:42,stun:0},
     bros:[
-      {x:w/2-70,prog:0,spd:3.3,w:26,h:42,type:'rowan',tt:0},
-      {x:w/2+70,prog:0,spd:3.1,w:26,h:46,type:'sandy',tt:0},
-      {x:w/2-30,prog:0,spd:2.9,w:26,h:40,type:'jude',tt:0},
+      {x:w/2-70,prog:0,spd:3.3,w:26,h:42,type:'rowan',tt:0,fallen:false},
+      {x:w/2+70,prog:0,spd:3.1,w:26,h:46,type:'sandy',tt:0,fallen:false},
+      {x:w/2-30,prog:0,spd:3.5,w:26,h:40,type:'jude',tt:0,fallen:false},
     ],
-    sb:[],trees:[],par:[]
+    sb:[],trees:[],par:[],judeFell:false,judeFellTimer:0
   };
-  for(let i=0;i<45;i++)LD.trees.push({x:Math.random()*w,y:300+i*(LD.rl/45),w:18,h:26});
+  for(let i=0;i<80;i++)LD.trees.push({x:Math.random()*w,y:250+i*(LD.rl/80),w:18,h:26});
 }
 
 function updL4(){
@@ -446,10 +476,19 @@ function updL4(){
   }
   if(g.y<75)g.y+=2;
   for(let b of LD.bros){
-    b.prog+=b.spd+Math.random()*.4;b.x+=(Math.random()-.5)*2.5;
+    if(b.fallen){continue} // Fallen brothers stop
+    // Jude starts fast, goes ahead, then falls at halfway
+    if(b.type==='jude'&&!LD.judeFell){
+      b.prog+=b.spd+1.2+Math.random()*.3; // Jude is faster initially
+      if(b.prog>=LD.rl*.5){LD.judeFell=true;b.fallen=true;LD.judeFellTimer=180}
+    }else if(b.type!=='jude'){
+      b.prog+=b.spd+Math.random()*.4;
+    }
+    b.x+=(Math.random()-.5)*2.5;
     b.x=Math.max(8,Math.min(w-b.w-8,b.x));b.tt++;
     if(b.tt>80+Math.random()*50){b.tt=0;LD.sb.push({x:b.x+b.w/2,tx:g.x+g.w/2,prog:b.prog+40})}
   }
+  if(LD.judeFellTimer>0)LD.judeFellTimer--;
   for(let i=LD.sb.length-1;i>=0;i--){
     const s=LD.sb[i];s.x+=(s.tx-s.x)*.04;s.prog+=3;
     if(levelStartTimer<=0&&Math.abs(s.prog-g.prog)<25&&Math.abs(s.x-g.x)<22){
@@ -468,7 +507,7 @@ function updL4(){
     if(LD.bros.some(b=>b.prog>=LD.rl)){die('A brother beat you!');return}
     state='win';winT=0;
   }
-  for(let b of LD.bros){if(b.prog>=LD.rl&&g.prog<LD.rl){die(b.type[0].toUpperCase()+b.type.slice(1)+' won the race!');return}}
+  for(let b of LD.bros){if(!b.fallen&&b.prog>=LD.rl&&g.prog<LD.rl){die(b.type[0].toUpperCase()+b.type.slice(1)+' won the race!');return}}
 }
 
 function drawL4(){
@@ -481,7 +520,22 @@ function drawL4(){
     X.fillStyle='#fff';X.beginPath();X.moveTo(t.x+2,ty+t.h/2);X.lineTo(t.x+t.w/2,ty+2);X.lineTo(t.x+t.w-2,ty+t.h/2);X.fill();
   }}
   for(let s of LD.sb){const sy=s.prog-g.prog+90;if(sy>-15&&sy<h+15){circ(s.x,sy,7,'#fff');circ(s.x-1,sy-1,3,'#e0e0e0')}}
-  for(let b of LD.bros){const by=(b.prog-g.prog)+75;if(by>-50&&by<h+50){drawBro(b.type,b.x,by,b.w,b.h);rect(b.x-1,by+b.h,b.w/2-1,3,'#795548');rect(b.x+b.w/2+1,by+b.h,b.w/2-1,3,'#795548')}}
+  for(let b of LD.bros){const by=(b.prog-g.prog)+75;if(by>-50&&by<h+50){
+    if(b.fallen){
+      // Fallen - draw sideways
+      X.save();X.translate(b.x+b.w/2,by+b.h/2);X.rotate(Math.PI/2);
+      drawBro(b.type,-b.w/2,-b.h/2,b.w,b.h);X.restore();
+      // Speech bubble
+      if(LD.judeFellTimer>0||by>-20){
+        const bx2=b.x+b.w+8,by2=by-20;
+        rect(bx2,by2,130,28,'#fff');rect(bx2+2,by2+2,126,24,'#fff');
+        X.fillStyle='#fff';X.beginPath();X.moveTo(bx2,by2+14);X.lineTo(bx2-8,by2+20);X.lineTo(bx2,by2+22);X.fill();
+        txt('My back is broken!!!!!',bx2+65,by2+14,9,'#333');
+      }
+    }else{
+      drawBro(b.type,b.x,by,b.w,b.h);rect(b.x-1,by+b.h,b.w/2-1,3,'#795548');rect(b.x+b.w/2+1,by+b.h,b.w/2-1,3,'#795548');
+    }
+  }}
   if(g.stun>0&&frame%6<3)X.globalAlpha=.5;
   drawGray(g.x,g.y,g.w,g.h);rect(g.x-4,g.y+g.h,g.w+8,4,'#1565C0');X.globalAlpha=1;
   if(g.stun<=0){for(let i=0;i<2;i++){X.globalAlpha=.4;circ(g.x+g.w/2+(Math.random()-.5)*16,g.y+g.h+8+Math.random()*8,2,'#fff');X.globalAlpha=1}}
@@ -498,15 +552,15 @@ function drawL4(){
 // ════════════════════════════════════════
 function initL5(){
   LD={ph:0,g:{hp:100,stm:100,punch:false,pt:0,block:false,ddir:0,dt:0,ht:0},
-    opp:null,stars:0,oppDown:false,kdt:0,msg:'',mt:0,par:[]};
+    opp:null,stars:0,oppDown:false,kdt:0,msg:'',mt:0,par:[],koMsg:''};
   startBox(0);
 }
 function startBox(ph){
-  LD.ph=ph;LD.g.hp=100;LD.g.stm=100;LD.oppDown=false;LD.kdt=0;
+  LD.ph=ph;LD.g.hp=100;LD.g.stm=100;LD.oppDown=false;LD.kdt=0;LD.koMsg='';
   const ops=[
-    {name:'ROWAN',type:'rowan',hp:80,mhp:80,spd:1,dmg:8,tel:42,at:0,phase:0,st:0,ps:0},
-    {name:'SANDY',type:'sandy',hp:100,mhp:100,spd:1.3,dmg:12,tel:32,at:0,phase:0,st:0,ps:0},
-    {name:'JUDE',type:'jude',hp:130,mhp:130,spd:1.5,dmg:15,tel:26,at:0,phase:0,st:0,ps:0},
+    {name:'ROWAN',type:'rowan',hp:100,mhp:100,spd:1,dmg:10,tel:42,at:0,phase:0,st:0,ps:0},
+    {name:'SANDY',type:'sandy',hp:120,mhp:120,spd:1.3,dmg:14,tel:32,at:0,phase:0,st:0,ps:0},
+    {name:'JUDE',type:'jude',hp:150,mhp:150,spd:1.5,dmg:18,tel:26,at:0,phase:0,st:0,ps:0},
   ];
   LD.opp=ops[ph];LD.msg='VS '+LD.opp.name+'!';LD.mt=80;
 }
@@ -518,15 +572,23 @@ function updL5(){
   if(g.stm<100&&!g.punch)g.stm+=.3;
   g.ddir=0;if(inp.dx<-.4)g.ddir=-1;if(inp.dx>.4)g.ddir=1;
   if(g.ddir)g.dt=8;if(g.dt>0)g.dt--;
-  g.block=inp.b;
+  // NO blocking - B does nothing in this version
+  g.block=false;
   if(inp.a&&!prevA&&g.stm>8&&!g.punch){
     g.punch=true;g.pt=10;g.stm-=10;
-    if(o.st>0||o.phase===0&&o.at<o.tel*.3){o.hp-=12+LD.stars*4;o.st=18;shake=4;shakeI=3;
+    // Reduced damage: 6 base + 2 per star (was 12+4)
+    if(o.st>0||o.phase===0&&o.at<o.tel*.3){o.hp-=6+LD.stars*2;o.st=18;shake=4;shakeI=3;
       for(let p=0;p<4;p++)LD.par.push({x:W()/2+(Math.random()-.5)*35,y:H()*.25+(Math.random()-.5)*15,dx:(Math.random()-.5)*7,dy:(Math.random()-.5)*7,l:14,c:'#FFD700'})}
-    else if(o.phase===1){o.hp-=22;o.st=25;LD.stars=Math.min(3,LD.stars+1);shake=7;shakeI=5;LD.msg='COUNTER!';LD.mt=25;
+    else if(o.phase===1){o.hp-=12;o.st=25;LD.stars=Math.min(3,LD.stars+1);shake=7;shakeI=5;LD.msg='COUNTER!';LD.mt=25;
       for(let p=0;p<8;p++)LD.par.push({x:W()/2+(Math.random()-.5)*50,y:H()*.25,dx:(Math.random()-.5)*9,dy:(Math.random()-.5)*9,l:18,c:'#00ff88'})}
-    else o.hp-=4;
-    if(o.hp<=0){o.hp=0;LD.oppDown=true;LD.kdt=150;shake=15;shakeI=9;LD.msg='KO!!!';LD.mt=50}
+    else o.hp-=2;
+    if(o.hp<=0){o.hp=0;LD.oppDown=true;LD.kdt=180;shake=15;shakeI=9;
+      // KO speech bubbles
+      if(o.type==='rowan'){LD.koMsg='QFFFF!'}
+      else if(o.type==='sandy'){LD.koMsg='NOOOOOO!!!!'}
+      else{LD.koMsg='GRAY!!!!!!!!!'}
+      LD.msg='KO!!!';LD.mt=50;
+    }
   }
   if(g.pt>0)g.pt--;if(g.pt<=0)g.punch=false;
   if(g.ht>0)g.ht--;
@@ -536,8 +598,8 @@ function updL5(){
   if(o.at>o.tel*2){
     o.phase=2;
     if(o.at===Math.floor(o.tel*2.5)){
-      if(g.block){g.stm-=14;if(g.stm<0)g.stm=0}
-      else if(g.dt>0&&g.ddir===-o.ps){LD.stars=Math.min(3,LD.stars+1)}
+      // Must dodge - no block option
+      if(g.dt>0&&g.ddir===-o.ps){LD.stars=Math.min(3,LD.stars+1)}
       else{g.hp-=o.dmg;g.ht=12;shake=7;shakeI=4;if(g.hp<=0){die(o.name+' knocked you out!');return}}
     }
   }else if(o.at>o.tel)o.phase=1;else o.phase=0;
@@ -582,7 +644,6 @@ function drawL5(){
   rect(gx+8,gy2-28,28,12,'#FF6B1A');
   // Gloves
   if(g.punch){rect(gx+44,gy2-10,25,25,'#FF6B1A');rect(gx-20,gy2+15,22,22,'#FF6B1A')}
-  else if(g.block){rect(gx+5,gy2-5,15,20,'#FF6B1A');rect(gx+25,gy2-5,15,20,'#FF6B1A')}
   else{
     const dOff=g.ddir*18;
     rect(gx-15+dOff,gy2+5,22,22,'#FF6B1A');rect(gx+38+dOff,gy2+5,22,22,'#FF6B1A');
@@ -600,7 +661,14 @@ function drawL5(){
   for(let p of LD.par){X.globalAlpha=p.l/18;circ(p.x,p.y,3,p.c)}X.globalAlpha=1;
   // Message
   if(LD.mt>0)otxt(LD.msg,w/2,h*.45,28,'#FFD700','#000');
-  drawCtrl('👊','BLK');
+  // KO speech bubble
+  if(LD.oppDown&&LD.koMsg){
+    const bx2=w/2+50,by2=h*.15;
+    rect(bx2,by2,140,32,'#fff');rect(bx2+2,by2+2,136,28,'#fff');
+    X.fillStyle='#fff';X.beginPath();X.moveTo(bx2,by2+16);X.lineTo(bx2-10,by2+22);X.lineTo(bx2,by2+24);X.fill();
+    txt(LD.koMsg,bx2+70,by2+16,11,'#333');
+  }
+  drawCtrl('👊','DGE');
 }
 
 // ════════════════════════════════════════
@@ -644,6 +712,24 @@ function drawGameWin(){
 
 // ── UTILITY ──
 function die(msg){deathMsg=msg;state='dead';shake=15;shakeI=7}
+let homeBtnRect={x:0,y:0,w:0,h:0};
+function drawHomeBtn(yPos){
+  const w=W(),bw=120,bh=30;
+  homeBtnRect={x:w/2-bw/2,y:yPos,w:bw,h:bh};
+  rect(homeBtnRect.x,homeBtnRect.y,bw,bh,'rgba(255,255,255,0.15)');
+  rect(homeBtnRect.x+1,homeBtnRect.y+1,bw-2,bh-2,'rgba(0,0,0,0.4)');
+  txt('🏠 HOME',w/2,yPos+bh/2,12,'#aaa');
+}
+function checkHomeBtn(){
+  let px=-1,py=-1;
+  if(mDown){px=lastMX;py=lastMY}
+  if(lastTX>=0){px=lastTX;py=lastTY}
+  if(px>=0&&px>=homeBtnRect.x&&px<=homeBtnRect.x+homeBtnRect.w&&py>=homeBtnRect.y&&py<=homeBtnRect.y+homeBtnRect.h){
+    state='title';titleSelect=0;return true;
+  }
+  if(K.Escape){state='title';titleSelect=0;return true}
+  return false;
+}
 
 // ── MAIN LOOP ──
 function loop(){
@@ -786,19 +872,20 @@ function drawIntro(){
 function drawDead(){
   const w=W(),h=H();
   rect(0,0,w,h,'rgba(0,0,0,.75)');
-  otxt('WIPEOUT!',w/2,h*.3,34,'#F44336','#000');
-  txt(deathMsg,w/2,h*.45,16,'#fff');
-  
-  // Fallen Gray
-  X.save();X.translate(w/2,h*.6);X.rotate(.5);
+  otxt('WIPEOUT!',w/2,h*.25,34,'#F44336','#000');
+  txt(deathMsg,w/2,h*.4,16,'#fff');
+  X.save();X.translate(w/2,h*.55);X.rotate(.5);
   drawGray(-15,-22,30,44);
   X.restore();
-  
   X.globalAlpha=.5+Math.sin(frame*.08)*.4;
-  txt('Tap to retry!',w/2,h*.78,16,'#fff');
+  txt('Tap to retry!',w/2,h*.73,16,'#fff');
   X.globalAlpha=1;
-  
-  if(T.a||T.b||mDown||K[' ']||K.Enter){initLevel(level)}
+  drawHomeBtn(h*.82);
+  if(checkHomeBtn())return;
+  if(T.a||T.b||mDown||K[' ']||K.Enter){
+    let px=lastMX>=0?lastMY:lastTY;
+    if(px<0||px<homeBtnRect.y){initLevel(level)}
+  }
 }
 
 function drawWin(){
@@ -829,6 +916,8 @@ function drawWin(){
     X.globalAlpha=.5+Math.sin(frame*.08)*.4;
     txt(level<5?'Tap to skip':'Tap to continue',w/2,h*.8,13,'#aaa');
     X.globalAlpha=1;
+    drawHomeBtn(h*.88);
+    if(checkHomeBtn())return;
   }
   // Auto-advance after ~3 second countdown (270 frames = 1.5s delay + 3s countdown)
   const shouldAdvance=(winT>270)||(winT>60&&(T.a||T.b||mDown||K[' ']||K.Enter));
