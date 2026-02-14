@@ -20,6 +20,8 @@ resize();window.addEventListener('resize',resize);
 // ── GLOBALS ──
 let state='title',level=1,frame=0,shake=0,shakeI=0,deathMsg='',introT=0,winT=0,LD={};
 let prevA=false,prevB=false;
+let levelStartTimer=0; // 3 second invincibility at start
+let titleSelect=0; // 0=start, 1-5=level select
 const W=()=>C.width, H=()=>C.height;
 
 // ── DRAWING ──
@@ -121,14 +123,16 @@ function handlePtr(px,py){
   if(Math.sqrt((px-bBtn.x)**2+(py-bBtn.y)**2)<bBtn.r*2)T.b=true;
 }
 
-C.addEventListener('touchstart',e=>{e.preventDefault();T.a=false;T.b=false;T.jx=0;T.jy=0;for(let t of e.touches)handlePtr(t.clientX,t.clientY)},{passive:false});
+C.addEventListener('touchstart',e=>{e.preventDefault();T.a=false;T.b=false;T.jx=0;T.jy=0;lastTX=e.touches[0].clientX;lastTY=e.touches[0].clientY;for(let t of e.touches)handlePtr(t.clientX,t.clientY)},{passive:false});
 C.addEventListener('touchmove',e=>{e.preventDefault();T.a=false;T.b=false;T.jx=0;T.jy=0;for(let t of e.touches)handlePtr(t.clientX,t.clientY)},{passive:false});
-C.addEventListener('touchend',e=>{e.preventDefault();T.a=false;T.b=false;T.jx=0;T.jy=0;for(let t of e.touches)handlePtr(t.clientX,t.clientY)},{passive:false});
+C.addEventListener('touchend',e=>{e.preventDefault();T.a=false;T.b=false;T.jx=0;T.jy=0;for(let t of e.touches)handlePtr(t.clientX,t.clientY);setTimeout(()=>{lastTX=-1;lastTY=-1},100)},{passive:false});
 
 let mDown=false;
-C.addEventListener('mousedown',e=>{mDown=true;T.a=false;T.b=false;handlePtr(e.clientX,e.clientY)});
+let lastMX=-1,lastMY=-1,lastTX=-1,lastTY=-1;
+let prevDown=false,prevUp=false;
+C.addEventListener('mousedown',e=>{mDown=true;T.a=false;T.b=false;lastMX=e.clientX;lastMY=e.clientY;handlePtr(e.clientX,e.clientY)});
 C.addEventListener('mousemove',e=>{if(mDown){T.a=false;T.b=false;T.jx=0;T.jy=0;handlePtr(e.clientX,e.clientY)}});
-C.addEventListener('mouseup',()=>{mDown=false;T.jx=0;T.jy=0;T.a=false;T.b=false});
+C.addEventListener('mouseup',()=>{mDown=false;T.jx=0;T.jy=0;T.a=false;T.b=false;setTimeout(()=>{lastMX=-1;lastMY=-1},100)});
 
 const K={};
 document.addEventListener('keydown',e=>{K[e.key]=true;if([' ','ArrowUp','ArrowDown'].includes(e.key))e.preventDefault()});
@@ -153,7 +157,7 @@ const LDESC=['',
 
 // ── INIT LEVEL ──
 function initLevel(n){
-  level=n;state='intro';introT=0;winT=0;deathMsg='';
+  level=n;state='intro';introT=0;winT=0;deathMsg='';levelStartTimer=180; // 3 sec at 60fps
   if(n===1)initL1();else if(n===2)initL2();else if(n===3)initL3();
   else if(n===4)initL4();else if(n===5)initL5();
 }
@@ -171,8 +175,8 @@ function initL1(){
       {x:-260,y:gy-44,w:32,h:44,spd:2.2,type:'jude'},
     ],houses:[],clouds:[]
   };
-  for(let i=0;i<55;i++){
-    const xp=350+i*(LD.lw-500)/55+Math.random()*80;
+  for(let i=0;i<30;i++){
+    const xp=600+i*(LD.lw-800)/30+Math.random()*60;
     const types=['car','dog','tree','ice','hydrant','trash'];
     const tp=types[(Math.random()*types.length)|0];
     let o={x:xp,type:tp};
@@ -190,6 +194,7 @@ function initL1(){
 
 function updL1(){
   const inp=input(),g=LD.g,gy=LD.gy,spd=5;
+  if(levelStartTimer>0)levelStartTimer--;
   g.duck=inp.b;
   LD.sx+=spd;
   if(inp.dx>.3)LD.sx+=2.5;
@@ -200,6 +205,7 @@ function updL1(){
   if(g.y>=gy-g.h){g.y=gy-g.h;g.vy=0;g.jump=false}
   g.x=LD.sx+W()*.2;
   const gh=g.duck?g.h*.55:g.h,gyt=g.duck?g.y+g.h-gh:g.y;
+  if(levelStartTimer<=0){
   for(let o of LD.obs){
     if(o.type==='ice'){if(g.x+g.w>o.x&&g.x<o.x+o.w&&!g.jump)LD.sx+=3;continue}
     if(g.x+g.w-6>o.x&&g.x+6<o.x+o.w&&gyt+gh>o.y&&gyt<o.y+o.h){
@@ -210,6 +216,9 @@ function updL1(){
   for(let b of LD.bros){
     b.x+=b.spd+spd*.45;if(b.x>g.x-25)b.x=g.x-25;
     if(Math.abs(b.x-g.x)<18&&Math.abs(b.y-gyt)<28){die(b.type[0].toUpperCase()+b.type.slice(1)+' caught you!');return}
+  }
+  }else{
+    for(let b of LD.bros){b.x+=b.spd+spd*.45;if(b.x>g.x-25)b.x=g.x-25}
   }
   if(g.x>=LD.lw-200){state='win';winT=0}
 }
@@ -241,6 +250,7 @@ function drawL1(){
   if(!LD.g.jump){rect(gx-2,gy-4,LD.g.w+4,4,'#8B4513');circ(gx+4,gy+1,3,'#333');circ(gx+LD.g.w-1,gy+1,3,'#333')}
   const prog=LD.sx/(LD.lw-W());
   rect(18,12,w-36,7,'rgba(0,0,0,.3)');rect(18,12,(w-36)*Math.min(1,prog),7,'#00ff88');
+  if(levelStartTimer>0){X.globalAlpha=.5+Math.sin(frame*.15)*.3;otxt('GO!',w/2,h*.35,36,'#00ff88','#000');X.globalAlpha=1}
   drawCtrl('JMP','DCK');
 }
 
@@ -257,10 +267,10 @@ function initL2(){
     ],blds:[],finX:0,finY:0,lh:h*4};
   let bx=0,by=h*3.2;
   for(let i=0;i<30;i++){
-    const bw=90+Math.random()*100,bh=180+Math.random()*250,gap=35+Math.random()*50;
+    const bw=100+Math.random()*110,bh=180+Math.random()*250,gap=50+Math.random()*65;
     LD.blds.push({x:bx,y:by-bh,w:bw,h:bh,c:`hsl(${210+Math.random()*30},${25+Math.random()*15}%,${35+Math.random()*25}%)`});
     LD.plats.push({x:bx,y:by-bh,w:bw,h:12});
-    if(i>1&&Math.random()>.45){
+    if(i>3&&Math.random()>.55){
       const tp=['wire','guard','tmnt'][(Math.random()*3)|0];
       LD.obs.push({x:bx+bw*.25,y:by-bh-35,w:tp==='wire'?bw*.5:26,h:tp==='wire'?4:36,type:tp,dir:1,sx:bx+8,ex:bx+bw-35});
     }
@@ -273,6 +283,7 @@ function initL2(){
 
 function updL2(){
   const inp=input(),g=LD.g,grav=.52;
+  if(levelStartTimer>0)levelStartTimer--;
   g.vx=inp.dx*4.5;g.x+=g.vx;g.duck=inp.b;
   if(inp.a&&g.gnd){g.vy=-12;g.jump=true;g.gnd=false}
   g.vy+=grav;g.y+=g.vy;g.gnd=false;
@@ -283,6 +294,7 @@ function updL2(){
   }
   if(g.y>LD.lh+80){die('Fell off the building!');return}
   const gh=g.duck?g.h*.5:g.h,gy=g.duck?g.y+g.h-gh:g.y;
+  if(levelStartTimer<=0){
   for(let o of LD.obs){
     if(o.type!=='wire'){o.x+=o.dir*1.4;if(o.x<=o.sx||o.x>=o.ex)o.dir*=-1}
     if(g.x+g.w-4>o.x&&g.x+4<o.x+o.w&&gy+gh>o.y&&gy<o.y+o.h){
@@ -293,6 +305,12 @@ function updL2(){
     b.x+=Math.sign(g.x-b.x)*b.spd;b.vy+=grav;b.y+=b.vy;
     for(let p of LD.plats){if(b.x+b.w>p.x&&b.x<p.x+p.w&&b.y+b.h>=p.y&&b.y+b.h<=p.y+15&&b.vy>=0){b.y=p.y-b.h;b.vy=0;if(Math.abs(g.x-b.x)>50&&Math.random()>.97)b.vy=-10}}
     if(Math.abs(b.x-g.x)<16&&Math.abs(b.y-g.y)<25){die(b.type[0].toUpperCase()+b.type.slice(1)+' caught you!');return}
+  }
+  }else{
+    for(let o of LD.obs){if(o.type!=='wire'){o.x+=o.dir*1.4;if(o.x<=o.sx||o.x>=o.ex)o.dir*=-1}}
+    for(let b of LD.bros){b.x+=Math.sign(g.x-b.x)*b.spd;b.vy+=grav;b.y+=b.vy;
+      for(let p of LD.plats){if(b.x+b.w>p.x&&b.x<p.x+p.w&&b.y+b.h>=p.y&&b.y+b.h<=p.y+15&&b.vy>=0){b.y=p.y-b.h;b.vy=0}}
+    }
   }
   LD.sx=g.x-W()*.3;LD.sy=g.y-H()*.5;
   if(g.x+g.w>LD.finX&&g.x<LD.finX+24&&gy<LD.finY+50&&gy+gh>LD.finY){state='win';winT=0}
@@ -340,6 +358,7 @@ function initL3(){
 
 function updL3(){
   const inp=input(),g=LD.g,w=W(),h=H();
+  if(levelStartTimer>0)levelStartTimer--;
   LD.timer--;
   g.x+=inp.dx*g.spd;g.y+=inp.dy*g.spd;
   g.x=Math.max(LD.ax,Math.min(g.x,LD.ax+LD.aw-g.w));
@@ -354,7 +373,7 @@ function updL3(){
     b.x+=b.dir*b.spd;if(b.x<=LD.ax+8||b.x>=LD.ax+LD.aw-b.w-8)b.dir*=-1;
     b.y+=Math.sin(frame*.02+b.spd)*1;b.y=Math.max(LD.ay,Math.min(b.y,LD.ay+LD.ah-b.h));
     b.st++;b.hit=Math.max(0,b.hit-1);
-    if(b.st>55+Math.random()*35){
+    if(levelStartTimer<=0&&b.st>55+Math.random()*35){
       b.st=0;const an=Math.atan2(g.y-b.y,g.x-b.x);
       LD.bul.push({x:b.x+b.w/2,y:b.y+b.h/2,dx:Math.cos(an)*5,dy:Math.sin(an)*5,f:false});
     }
@@ -412,11 +431,12 @@ function initL4(){
     ],
     sb:[],trees:[],par:[]
   };
-  for(let i=0;i<70;i++)LD.trees.push({x:Math.random()*w,y:180+i*(LD.rl/70),w:18,h:26});
+  for(let i=0;i<45;i++)LD.trees.push({x:Math.random()*w,y:300+i*(LD.rl/45),w:18,h:26});
 }
 
 function updL4(){
   const inp=input(),g=LD.g,w=W();
+  if(levelStartTimer>0)levelStartTimer--;
   if(g.stun>0){g.stun--;g.prog+=1}
   else{
     g.spd=4;if(inp.b)g.spd=6;
@@ -432,7 +452,7 @@ function updL4(){
   }
   for(let i=LD.sb.length-1;i>=0;i--){
     const s=LD.sb[i];s.x+=(s.tx-s.x)*.04;s.prog+=3;
-    if(Math.abs(s.prog-g.prog)<25&&Math.abs(s.x-g.x)<22){
+    if(levelStartTimer<=0&&Math.abs(s.prog-g.prog)<25&&Math.abs(s.x-g.x)<22){
       g.stun=100;LD.sb.splice(i,1);shake=8;shakeI=5;
       for(let p=0;p<6;p++)LD.par.push({x:g.x+g.w/2,y:90,dx:(Math.random()-.5)*5,dy:(Math.random()-.5)*5,l:18,c:'#fff'});
       continue;
@@ -441,7 +461,7 @@ function updL4(){
   }
   for(let t of LD.trees){
     const ty=t.y-g.prog+90;
-    if(ty>55&&ty<110&&Math.abs(t.x-g.x)<16){g.stun=50;shake=6;shakeI=4}
+    if(levelStartTimer<=0&&ty>55&&ty<110&&Math.abs(t.x-g.x)<16){g.stun=50;shake=6;shakeI=4}
   }
   for(let i=LD.par.length-1;i>=0;i--){const p=LD.par[i];p.x+=p.dx;p.y+=p.dy;p.l--;if(p.l<=0)LD.par.splice(i,1)}
   if(g.prog>=LD.rl){
@@ -618,6 +638,7 @@ function drawGameWin(){
     X.globalAlpha=.5+Math.sin(frame*.08)*.3;
     txt('Tap to play again!',w/2,h*.88,16,'#fff');
     X.globalAlpha=1;
+    if(T.a||T.b||mDown||K[' ']||K.Enter){state='title';titleSelect=0;winT=0}
   }
 }
 
@@ -665,26 +686,71 @@ function drawTitle(){
   }
   
   const b=Math.sin(frame*.04)*4;
-  otxt('BROTHER',w/2,h*.18+b,Math.min(42,w*.09),'#FF6B1A','#000');
-  otxt('BEAT DOWN',w/2,h*.28+b,Math.min(48,w*.1),'#FFD700','#000');
+  otxt('BROTHER',w/2,h*.1+b,Math.min(38,w*.085),'#FF6B1A','#000');
+  otxt('BEAT DOWN',w/2,h*.18+b,Math.min(44,w*.095),'#FFD700','#000');
   
-  // Characters
-  const cx=w/2,cy=h*.48;
-  drawGray(cx-16,cy-50,34,48);
-  drawRowan(cx-80,cy-20,30,44);
-  drawSandy(cx+55,cy-30,30,50);
-  drawJude(cx-40,cy+20,30,42);
+  // Characters row
+  const cx=w/2,cy=h*.27;
+  drawGray(cx-16,cy-24,30,42);
+  otxt('VS',cx+25,cy,16,'#F44336','#000');
+  drawRowan(cx-72,cy-10,26,38);
+  drawSandy(cx+48,cy-14,26,42);
+  drawJude(cx-38,cy+10,26,36);
   
-  // VS sparks
-  otxt('VS',cx+20,cy,22,'#F44336','#000');
+  // Level select buttons
+  const btnW=Math.min(260,w*.7);
+  const btnH=36;
+  const btnX=w/2-btnW/2;
+  const startY=h*.4;
+  const gap=44;
   
-  X.globalAlpha=.5+Math.sin(frame*.06)*.4;
-  txt('Tap to Start!',w/2,h*.78,18,'#fff');
-  X.globalAlpha=1;
-  txt('🎮 Use joystick + A/B buttons',w/2,h*.86,11,'#aaa');
-  txt('⌨️  Arrows + Z/X keys',w/2,h*.92,11,'#aaa');
+  // "Play from Level 1" big button
+  const playHover=titleSelect===0;
+  rect(btnX,startY,btnW,btnH+4,playHover?'#FF6B1A':'#FF6B1A80');
+  rect(btnX+2,startY+2,btnW-4,btnH,playHover?'#FF8C3A':'#3a2a1a');
+  txt('▶  PLAY FROM START',w/2,startY+btnH/2+2,14,playHover?'#fff':'#ddd');
   
-  if(T.a||T.b||T.jx||T.jy||mDown||K[' ']||K.Enter){initLevel(1)}
+  // Individual level buttons
+  const lvlIcons=['','🛹','🏙️','🔫','🏂','🥊'];
+  for(let i=1;i<=5;i++){
+    const by=startY+50+i*gap;
+    const hover=titleSelect===i;
+    rect(btnX,by,btnW,btnH,hover?'#4a3a8e':'#2a1a4e');
+    rect(btnX+2,by+2,btnW-4,btnH-4,hover?'#5a4a9e':'#1a1a3e');
+    const lc=hover?'#FFD700':'#aaa';
+    txt(lvlIcons[i]+' Lv'+i+': '+LNAME[i],w/2,by+btnH/2-1,11,lc);
+  }
+  
+  // Instructions
+  txt('🎮 Joystick + A/B  |  ⌨️ Arrows + Z/X',w/2,h*.95,9,'#666');
+  
+  // Handle touch/click on buttons
+  const checkSelect=()=>{
+    // Check for any pointer interaction
+    let px=-1,py=-1;
+    if(mDown){px=lastMX;py=lastMY}
+    if(lastTX>=0){px=lastTX;py=lastTY}
+    if(px<0)return;
+    // Play button
+    if(px>=btnX&&px<=btnX+btnW&&py>=startY&&py<=startY+btnH+4){titleSelect=0;initLevel(1);return}
+    // Level buttons
+    for(let i=1;i<=5;i++){
+      const by=startY+50+i*gap;
+      if(px>=btnX&&px<=btnX+btnW&&py>=by&&py<=by+btnH){titleSelect=i;initLevel(i);return}
+    }
+  };
+  
+  // Keyboard navigation
+  if(K.ArrowDown&&!prevDown){titleSelect=Math.min(5,titleSelect+1);prevDown=true}
+  else if(!K.ArrowDown)prevDown=false;
+  if(K.ArrowUp&&!prevUp){titleSelect=Math.max(0,titleSelect-1);prevUp=true}
+  else if(!K.ArrowUp)prevUp=false;
+  if(K.Enter||K[' ']){
+    if(titleSelect===0)initLevel(1);
+    else initLevel(titleSelect);
+  }
+  
+  checkSelect();
 }
 
 function drawIntro(){
@@ -740,26 +806,35 @@ function drawWin(){
   winT++;
   rect(0,0,w,h,'rgba(0,0,0,.7)');
   const b=Math.sin(frame*.06)*4;
-  otxt('LEVEL CLEAR!',w/2,h*.25+b,32,'#00ff88','#000');
-  otxt(LNAME[level],w/2,h*.38,18,'#FFD700','#000');
+  otxt('LEVEL CLEAR!',w/2,h*.2+b,32,'#00ff88','#000');
+  otxt(LNAME[level],w/2,h*.33,18,'#FFD700','#000');
   
   // Victory Gray
-  drawGray(w/2-16,h*.48,34,48);
+  drawGray(w/2-16,h*.42,34,48);
   // Victory sparkles
   for(let i=0;i<8;i++){
     const sx=w/2-40+Math.sin(frame*.05+i*.8)*50;
-    const sy=h*.52+Math.cos(frame*.05+i*.8)*30;
+    const sy=h*.46+Math.cos(frame*.05+i*.8)*30;
     X.globalAlpha=.6;circ(sx,sy,3,'#FFD700');X.globalAlpha=1;
   }
   
-  if(winT>40){
-    X.globalAlpha=.5+Math.sin(frame*.08)*.4;
-    txt(level<5?'Tap for next level!':'Tap to continue!',w/2,h*.78,16,'#fff');
-    X.globalAlpha=1;
-    if(T.a||T.b||mDown||K[' ']||K.Enter){
-      if(level<5)initLevel(level+1);
-      else{state='gameWin';winT=0}
+  // Auto-progress countdown (3 seconds after 1.5s delay)
+  if(winT>90){
+    const remaining=Math.ceil((270-winT)/60);
+    if(remaining>0){
+      txt('Next level in '+remaining+'...',w/2,h*.72,16,'#fff');
     }
+  }
+  if(winT>60){
+    X.globalAlpha=.5+Math.sin(frame*.08)*.4;
+    txt(level<5?'Tap to skip':'Tap to continue',w/2,h*.8,13,'#aaa');
+    X.globalAlpha=1;
+  }
+  // Auto-advance after ~3 second countdown (270 frames = 1.5s delay + 3s countdown)
+  const shouldAdvance=(winT>270)||(winT>60&&(T.a||T.b||mDown||K[' ']||K.Enter));
+  if(shouldAdvance){
+    if(level<5)initLevel(level+1);
+    else{state='gameWin';winT=0}
   }
 }
 
